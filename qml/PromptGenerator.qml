@@ -1,0 +1,458 @@
+import QtQuick
+import QtQuick.Controls
+import QtQuick.Layouts
+
+Item {
+    id: root
+    anchors.fill: parent
+
+    // 向主窗体发送返回信号
+    signal backRequested()
+
+    // 内部固化调色板
+    QtObject {
+        id: localPalette
+        readonly property color bgTop: "#121826"
+        readonly property color bgBottom: "#0A0E17"
+        readonly property color neonCyan: "#00B4D8"
+        readonly property color neonGreen: "#00C853"
+        readonly property color panelBg: "#171E2E"
+        readonly property color textMain: "#CBD5E1"
+        readonly property color textDim: "#64748B"
+    }
+
+    Component.onCompleted: {
+        generatePrompt()
+    }
+
+    // 提示词生成核心逻辑
+    function generatePrompt() {
+        if (!id_cbVersion || !id_txtReq || !id_txtOutput) {
+            return
+        }
+
+        var activeRules = []
+        if (id_chkModern.checked) activeRules.push("* 【语法规范】强制使用现代 C++ (C++17/20) 及 Qt 6 推荐语法。")
+        if (id_chkLoop.checked) activeRules.push("* 【事件驱动】禁止长循环阻塞，须用事件驱动或异步设计。")
+        if (id_chkMem.checked) activeRules.push("* 【内存安全】跨线程销毁强制使用 deleteLater；严格管理对象父子树。")
+        if (id_chkQml.checked) activeRules.push("* 【QML所有权】C++向QML传递QObject指针时，必须显式声明 QQmlEngine::CppOwnership。")
+        if (id_chkMvc.checked) activeRules.push("* 【架构解耦】遵循 MVC/MVVM 架构，C++ 端只负责业务逻辑与数据准备，绝对不直接操作 UI。")
+        if (id_chkRobust.checked) activeRules.push("* 【健壮性】代码必须具备强健壮性（涵盖指针判空、通信超时异常处理）。")
+
+        var rulesStr = activeRules.length > 0 ? activeRules.join("\n") : "* 遵循 Qt 官方最佳实践即可。"
+        var codeLogSection = id_txtCodeLog.text.trim() !== "" ? "【现有代码/报错日志】\n" + id_txtCodeLog.text + "\n\n" : ""
+
+        var formatStr = "【专家级剖析】：包含代码、底层机制剖析及排查步骤。"
+        if (id_rbDiff.checked) formatStr = "【补丁模式 (Diff)】：仅输出需修改/新增的代码片段，极致节约 Token。"
+        else if (id_rbBrief.checked) formatStr = "【极简代码片段】：仅输出核心实现代码，省略基础 #include。"
+        else if (id_rbFull.checked) formatStr = "【完整工程文件】：输出 .h 和 .cpp，适合直接集成。"
+
+        var prompt =
+            "【身份设定】\n" +
+            "你是一位拥有 10 年以上经验的 Qt 软件架构师与现代 C++ 专家。\n\n" +
+            "【背景 Context】\n" +
+            "- 框架版本：" + id_cbVersion.currentText + "\n" +
+            "- 目标平台：" + id_cbPlatform.currentText + " | 编译器：" + id_cbToolchain.currentText + "\n" +
+            "- 构建工具：" + id_cbBuild.currentText + "\n" +
+            "- 整体架构：" + id_cbArch.currentText + "\n" +
+            "- 图形后端：" + id_cbGraphics.currentText + "\n\n" +
+            "【任务 Task】\n" +
+            "请帮我完成 [ " + id_cbCategory.currentText + " ] 相关的开发任务。具体需求如下：\n" +
+            id_txtReq.text + "\n\n" +
+            codeLogSection +
+            "【约束 Constraint】\n" +
+            rulesStr + "\n\n" +
+            "【反幻觉与兜底指令】\n" +
+            "1. 绝不伪造 API：如果你无法 100% 确定某个 Qt API 是否存在，绝不允许自行编造。\n" +
+            "2. 严格限制依赖：只允许使用 Qt 原生模块与目标环境对应的 C++ 标准库。\n\n" +
+            "【格式 Format】\n" +
+            formatStr
+
+        id_txtOutput.text = prompt
+    }
+
+    Rectangle {
+        anchors.fill: parent
+        color: localPalette.bgBottom
+    }
+
+    ColumnLayout {
+        anchors.fill: parent
+        anchors.margins: 15
+        spacing: 12
+
+        RowLayout {
+            Layout.fillWidth: true
+            // 🌟 返回主控台按钮：已重塑为赛博风格
+            Button {
+                id: btnBack
+                text: "< 返回主控台"
+                Layout.preferredHeight: 32
+                Layout.preferredWidth: 130
+                contentItem: Text {
+                    text: btnBack.text
+                    color: btnBack.pressed ? "#121826" : localPalette.neonCyan
+                    font.family: "Courier New"
+                    font.pixelSize: 14
+                    font.weight: Font.Bold
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                }
+                background: Rectangle {
+                    color: btnBack.pressed ? localPalette.neonCyan : "transparent"
+                    border.color: localPalette.neonCyan
+                    border.width: 1
+                    radius: 2
+                    Behavior on color { ColorAnimation { duration: 100 } }
+                }
+                onClicked: root.backRequested()
+            }
+            Item { Layout.fillWidth: true }
+            Text {
+                text: "🚀 CtxPack // PROMPT_GEAR"
+                font.pixelSize: 16
+                font.bold: true
+                font.family: "Courier New"
+                color: localPalette.neonCyan
+            }
+        }
+
+        ScrollView {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            clip: true
+            contentWidth: availableWidth
+
+            ColumnLayout {
+                width: parent.width - 10
+                spacing: 10
+
+                GroupBox {
+                    id: grpContext
+                    title: "【背景 Context】项目环境"
+                    Layout.fillWidth: true
+                    background: Rectangle { color: localPalette.panelBg; border.color: localPalette.textDim; radius: 4 }
+                    label: Text { text: grpContext.title; color: localPalette.neonCyan; font.bold: true }
+
+                    ColumnLayout {
+                        anchors.fill: parent
+                        spacing: 4
+
+                        RowLayout {
+                            Text { text: "Qt 版本:"; color: localPalette.textMain; Layout.preferredWidth: 60 }
+                            CyberComboBox { id: id_cbVersion; model: ["Qt 6.x (现代标准)", "Qt 5.15 (遗留维护)", "PyQt6/PySide6"]; Layout.fillWidth: true; onCurrentIndexChanged: root.generatePrompt() }
+                        }
+                        RowLayout {
+                            Text { text: "目标平台:"; color: localPalette.textMain; Layout.preferredWidth: 60 }
+                            CyberComboBox { id: id_cbPlatform; model: ["Windows", "Linux", "macOS", "跨平台通用"]; Layout.fillWidth: true; onCurrentIndexChanged: root.generatePrompt() }
+                        }
+                        RowLayout {
+                            Text { text: "工具链:"; color: localPalette.textMain; Layout.preferredWidth: 60 }
+                            CyberComboBox { id: id_cbToolchain; model: ["MSVC", "GCC/MinGW", "Clang"]; Layout.fillWidth: true; onCurrentIndexChanged: root.generatePrompt() }
+                        }
+                        RowLayout {
+                            Text { text: "构建系统:"; color: localPalette.textMain; Layout.preferredWidth: 60 }
+                            CyberComboBox { id: id_cbBuild; model: ["CMake", "qmake", "Qbs"]; Layout.fillWidth: true; onCurrentIndexChanged: root.generatePrompt() }
+                        }
+                        RowLayout {
+                            Text { text: "核心架构:"; color: localPalette.textMain; Layout.preferredWidth: 60 }
+                            CyberComboBox { id: id_cbArch; model: ["QML 前端 + C++ 后端", "纯 QWidget 桌面端", "无头服务端 (Console)", "Qt for Embedded Linux", "Qt for WebAssembly"]; Layout.fillWidth: true; onCurrentIndexChanged: root.generatePrompt() }
+                        }
+                        RowLayout {
+                            Text { text: "图形后端:"; color: localPalette.textMain; Layout.preferredWidth: 60 }
+                            CyberComboBox { id: id_cbGraphics; model: ["Qt RHI (默认)", "OpenGL", "Vulkan", "纯软件渲染"]; Layout.fillWidth: true; onCurrentIndexChanged: root.generatePrompt() }
+                        }
+                    }
+                }
+
+                GroupBox {
+                    id: grpTask
+                    title: "【任务 Task】需求设定"
+                    Layout.fillWidth: true
+                    background: Rectangle { color: localPalette.panelBg; border.color: localPalette.textDim; radius: 4 }
+                    label: Text { text: grpTask.title; color: localPalette.neonCyan; font.bold: true }
+
+                    ColumnLayout {
+                        anchors.fill: parent
+                        spacing: 4
+                        CyberComboBox { id: id_cbCategory; model: ["UI 与动画", "C++/QML 混合编程", "跨线程与并发", "硬件与网络通信", "内存排错与架构", "数据库与本地存储", "CMake 工程配置"]; Layout.fillWidth: true; onCurrentIndexChanged: root.generatePrompt() }
+                        Text { text: "具体需求说明:"; color: localPalette.textMain }
+                        TextArea {
+                            id: id_txtReq
+                            placeholderText: "输入重构或增量需求..."
+                            color: localPalette.textMain
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: 50
+                            wrapMode: TextEdit.Wrap
+                            background: Rectangle { color: localPalette.bgBottom; border.color: localPalette.textDim }
+                            onTextChanged: root.generatePrompt()
+                        }
+                        Text { text: "现有代码/日志 (选填):"; color: localPalette.textMain }
+                        TextArea {
+                            id: id_txtCodeLog
+                            placeholderText: "粘贴相关源码或崩溃日志..."
+                            color: localPalette.textMain
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: 60
+                            font.family: "Courier New"
+                            font.pixelSize: 11
+                            wrapMode: TextEdit.Wrap
+                            background: Rectangle { color: localPalette.bgBottom; border.color: localPalette.textDim }
+                            onTextChanged: root.generatePrompt()
+                        }
+                    }
+                }
+
+                // ==========================================
+                // ⚡ UI 修复：在 ColumnLayout 内部定义专属的赛博风 CheckBox / RadioButton
+                // 这将完美解决暗黑模式下的对比度问题，并增加悬浮高亮反馈
+                // ==========================================
+                component CyberCheckBox : CheckBox {
+                    id: cChk
+                    contentItem: Text {
+                        text: cChk.text
+                        font.family: "Microsoft YaHei"
+                        font.pixelSize: 13
+                        // 选中时青色，悬浮时纯白，默认时高亮灰白
+                        color: cChk.checked ? localPalette.neonCyan : (cChk.hovered ? "#FFFFFF" : localPalette.textMain)
+                        verticalAlignment: Text.AlignVCenter
+                        leftPadding: cChk.indicator.width + cChk.spacing
+                        Behavior on color { ColorAnimation { duration: 150 } }
+                    }
+                }
+
+                component CyberRadioButton : RadioButton {
+                    id: cRad
+                    contentItem: Text {
+                        text: cRad.text
+                        font.family: "Microsoft YaHei"
+                        font.pixelSize: 13
+                        color: cRad.checked ? localPalette.neonCyan : (cRad.hovered ? "#FFFFFF" : localPalette.textMain)
+                        verticalAlignment: Text.AlignVCenter
+                        leftPadding: cRad.indicator.width + cRad.spacing
+                        Behavior on color { ColorAnimation { duration: 150 } }
+                    }
+                }
+                // ==========================================
+                // ⚡ UI 修复 2：定义深色科幻风格的下拉框组件，碾碎原生白底黑字的突兀感
+                // ==========================================
+                component CyberComboBox : ComboBox {
+                    id: control
+
+                    // 选中的文本显示区
+                    contentItem: Text {
+                        leftPadding: 10
+                        rightPadding: control.indicator.width + control.spacing
+                        text: control.displayText
+                        font.family: "Courier New"
+                        font.pixelSize: 13
+                        font.weight: Font.Bold
+                        color: localPalette.neonCyan
+                        verticalAlignment: Text.AlignVCenter
+                        elide: Text.ElideRight
+                    }
+
+                    // 默认状态的暗色底板
+                    background: Rectangle {
+                        implicitWidth: 120
+                        implicitHeight: 32
+                        color: localPalette.bgBottom
+                        border.color: control.pressed || control.popup.visible ? localPalette.neonGreen : Qt.alpha(localPalette.neonCyan, 0.5)
+                        border.width: 1
+                        radius: 2
+                        Behavior on border.color { ColorAnimation { duration: 150 } }
+                    }
+
+                    // 极简倒三角指示器 (抛弃 Canvas 采用纯文本，0渲染开销)
+                    indicator: Text {
+                        x: control.width - width - control.rightPadding + 5
+                        y: control.topPadding + (control.availableHeight - height) / 2
+                        text: "▼"
+                        font.pixelSize: 10
+                        color: control.pressed || control.popup.visible ? localPalette.neonGreen : localPalette.neonCyan
+                    }
+
+                    // 展开的下拉列表外壳
+                    popup: Popup {
+                        y: control.height - 1
+                        width: control.width
+                        implicitHeight: contentItem.implicitHeight
+                        padding: 1
+
+                        contentItem: ListView {
+                            clip: true
+                            implicitHeight: contentHeight
+                            model: control.popup.visible ? control.delegateModel : null
+                            currentIndex: control.highlightedIndex
+                            ScrollIndicator.vertical: ScrollIndicator { }
+                        }
+
+                        background: Rectangle {
+                            color: localPalette.panelBg
+                            border.color: localPalette.neonCyan
+                            border.width: 1
+                            radius: 2
+                        }
+                    }
+
+                    // 下拉列表每一项的悬浮交互逻辑
+                    delegate: ItemDelegate {
+                        width: control.width
+                        padding: 10
+                        contentItem: Text {
+                            text: modelData
+                            color: highlighted ? localPalette.bgBottom : localPalette.textMain
+                            font.family: "Microsoft YaHei"
+                            font.pixelSize: 13
+                            elide: Text.ElideRight
+                            verticalAlignment: Text.AlignVCenter
+                        }
+                        background: Rectangle {
+                            color: highlighted ? localPalette.neonCyan : "transparent"
+                        }
+                        highlighted: control.highlightedIndex === index
+                    }
+                }
+                GroupBox {
+                    id: grpConstraint
+                    title: "【约束 Constraint】高阶防雷"
+                    Layout.fillWidth: true
+                    background: Rectangle { color: localPalette.panelBg; border.color: localPalette.textDim; radius: 4 }
+                    label: Text { text: grpConstraint.title; color: localPalette.neonCyan; font.bold: true }
+
+                    // 强行覆盖局部调色板，修复 CheckBox 默认方框在暗色背景下看不清的问题
+                    palette.windowText: localPalette.textMain
+                    palette.base: localPalette.bgBottom
+                    palette.button: localPalette.bgTop
+
+                    ColumnLayout {
+                        spacing: 1
+                        // 使用全新的 CyberCheckBox 替换原生的 CheckBox
+                        CyberCheckBox { id: id_chkModern; text: "现代 C++ / Qt 6 推荐语法"; checked: true; onCheckedChanged: root.generatePrompt() }
+                        CyberCheckBox { id: id_chkLoop; text: "基于事件驱动 (防异步阻塞)"; checked: true; onCheckedChanged: root.generatePrompt() }
+                        CyberCheckBox { id: id_chkMem; text: "跨线程安全调用 (deleteLater)"; checked: true; onCheckedChanged: root.generatePrompt() }
+                        CyberCheckBox { id: id_chkQml; text: "QML 传递所有权声明 (防 GC)"; checked: true; onCheckedChanged: root.generatePrompt() }
+                        CyberCheckBox { id: id_chkMvc; text: "MVC 严格解耦 (C++ 不操纵UI)"; checked: true; onCheckedChanged: root.generatePrompt() }
+                        CyberCheckBox { id: id_chkRobust; text: "包含完善边界异常/指针判空"; checked: true; onCheckedChanged: root.generatePrompt() }
+                    }
+                }
+
+                GroupBox {
+                    id: grpFormat
+                    title: "【格式 Format】交付样式"
+                    Layout.fillWidth: true
+                    background: Rectangle { color: localPalette.panelBg; border.color: localPalette.textDim; radius: 4 }
+                    label: Text { text: grpFormat.title; color: localPalette.neonCyan; font.bold: true }
+
+                    // 强行覆盖局部调色板，修复 RadioButton 默认圆圈在暗色背景下看不清的问题
+                    palette.windowText: localPalette.textMain
+                    palette.base: localPalette.bgBottom
+                    palette.button: localPalette.bgTop
+
+                    ColumnLayout {
+                        spacing: 1
+                        // 使用全新的 CyberRadioButton 替换原生的 RadioButton
+                        CyberRadioButton { id: id_rbDiff; text: "补丁模式 (Diff) [推荐本地模型]"; checked: true; onCheckedChanged: root.generatePrompt() }
+                        CyberRadioButton { id: id_rbBrief; text: "极简核心代码片段"; onCheckedChanged: root.generatePrompt() }
+                        CyberRadioButton { id: id_rbFull; text: "完整文件配置 (.h/.cpp)"; onCheckedChanged: root.generatePrompt() }
+                        CyberRadioButton { id: id_rbExpert; text: "专家级底层机制剖析"; onCheckedChanged: root.generatePrompt() }
+                    }
+                }
+            }
+        }
+
+        // ==========================================
+        // 底部：终极提示词输出区域 (重构版)
+        // ==========================================
+        ColumnLayout {
+            Layout.fillWidth: true
+            Layout.preferredHeight: 220 // 略微增加首选高度以容纳更大的字体
+            spacing: 6
+
+            Text {
+                text: "🔥 生成的终极提示词:"
+                color: localPalette.neonCyan
+                font.bold: true
+                font.pixelSize: 14 // 标题字体同步适度放大
+            }
+
+            // 🌟 核心修复 1：引入 ScrollView 包裹 TextArea 并开启裁切
+            ScrollView {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                clip: true // 【防雷】必须开启，防止文本滚出边界覆盖到其他 UI
+
+
+                // 【UI优化】赛博朋克风格的定制拖动条
+                ScrollBar.vertical: ScrollBar {
+                    policy: ScrollBar.AsNeeded // ✅ 修复：将 policy 作为内部属性声明
+                    width: 8
+                    background: Rectangle { color: localPalette.bgBottom }
+                    contentItem: Rectangle { color: localPalette.neonCyan; radius: 4 }
+                }
+
+                TextArea {
+                    id: id_txtOutput
+                    // 🚨 注意：去掉了这里的 Layout 属性，尺寸计算全权交给父级 ScrollView
+                    readOnly: true
+                    wrapMode: TextArea.Wrap // 自动换行
+                    font.family: "Courier New"
+                    font.pixelSize: 15 // 🌟 核心修复 2：字体从 11 大幅放大至 15
+                    font.weight: Font.Medium // 增加字重提升对比度
+                    color: localPalette.neonGreen
+
+                    // 护眼与反差色选中效果
+                    selectionColor: localPalette.neonGreen
+                    selectedTextColor: "#121826"
+
+                    background: Rectangle {
+                        color: localPalette.panelBg
+                        border.color: localPalette.neonCyan
+                        radius: 4
+                    }
+                }
+            }
+
+            // 🌟 核心修复 3：移除跨文件不可见的 CyberButton，使用原生 Button 并原地应用赛博主题
+            Button {
+                id: btnCopyPrompt
+                Layout.fillWidth: true
+                Layout.preferredHeight: 40
+                text: "📋 一键复制提示词"
+
+                // 赛博风文字设定
+                contentItem: Text {
+                    text: btnCopyPrompt.text
+                    color: btnCopyPrompt.pressed ? "#121826" : localPalette.neonCyan
+                    font.family: "Courier New"
+                    font.pixelSize: 15
+                    font.weight: Font.Bold
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                }
+
+                // 赛博风外壳设定
+                background: Rectangle {
+                    color: btnCopyPrompt.pressed ? localPalette.neonCyan : "transparent"
+                    border.color: localPalette.neonCyan
+                    border.width: 1
+                    radius: 2
+                    Behavior on color { ColorAnimation { duration: 100 } }
+                }
+
+                onClicked: {
+                    id_txtOutput.selectAll()
+                    id_txtOutput.copy()
+                    id_txtOutput.deselect()
+
+                    // 按钮点击反馈
+                    var originalText = text
+                    text = "[ ✔_COPIED ]"
+                    var t = Qt.createQmlObject('import QtQuick 2.0; Timer { interval: 1500; repeat: false; }', btnCopyPrompt)
+                    t.triggered.connect(function() { text = originalText; t.destroy() })
+                    t.start()
+                }
+            }
+        }
+    }
+}

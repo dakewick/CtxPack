@@ -261,122 +261,169 @@ Window {
                     }
 
                     // ==========================================
-                                // 💾 核心新增：另存为文件对话框
-                                // ==========================================
-                                FileDialog {
-                                    id: saveProjectMapDialog
-                                    title: "[SYS.REQ] SAVE_MAP_STREAM_TO_FILE"
-                                    currentFile: "file:///project_map.md"
-                                    fileMode: FileDialog.SaveFile
-                                    nameFilters: ["Markdown files (*.md)", "Text files (*.txt)"]
-                                    onAccepted: {
-                                        // 1. 剥离纯净的本地保存物理路径
-                                        var rawUrl = selectedFile.toString();
-                                        var cleanSavePath = "";
-                                        if (rawUrl.startsWith("file:///")) {
-                                            cleanSavePath = rawUrl.substring(8);
-                                        } else if (rawUrl.startsWith("file:")) {
-                                            cleanSavePath = rawUrl.substring(5);
-                                        } else {
-                                            cleanSavePath = rawUrl;
-                                        }
-                                        cleanSavePath = decodeURIComponent(cleanSavePath);
+                    // 💾 核心新增：另存为文件对话框
+                    // ==========================================
+                    FileDialog {
+                        id: saveProjectMapDialog
+                        title: "[SYS.REQ] SAVE_MAP_STREAM_TO_FILE"
+                        currentFile: "file:///project_map.md"
+                        fileMode: FileDialog.SaveFile
+                        nameFilters: ["Markdown files (*.md)", "Text files (*.txt)"]
+                        onAccepted: {
+                            // 1. 剥离纯净的本地保存物理路径
+                            var rawUrl = selectedFile.toString()
+                            var cleanSavePath = ""
+                            if (rawUrl.startsWith("file:///")) {
+                                cleanSavePath = rawUrl.substring(8)
+                            } else if (rawUrl.startsWith("file:")) {
+                                cleanSavePath = rawUrl.substring(5)
+                            } else {
+                                cleanSavePath = rawUrl
+                            }
+                            cleanSavePath = decodeURIComponent(cleanSavePath)
 
-                                        // 2. 直接调用 C++ 后台原生的 saveToFile 驱动进行硬核写入
-                                        var fileSaved = compressorBackend.saveToFile(cleanSavePath, resultArea.text);
-                                        if (fileSaved) {
-                                            // 临时将文本框顶端提示刷新，作为成功的视觉反馈
-                                            var oldText = resultArea.text;
-                                            resultArea.insert(0, ">> [SYS.INFO] FILE_SAVE_SUCCESS_AT: " + cleanSavePath + "\n\n");
+                            // 2. 直接调用 C++ 后台原生的 saveToFile 驱动进行硬核写入
+                            var fileSaved = compressorBackend.saveToFile(cleanSavePath, resultArea.text)
+                            if (fileSaved) {
+                                // 临时将文本框顶端提示刷新，作为成功的视觉反馈
+                                resultArea.insert(0, ">> [SYS.INFO] FILE_SAVE_SUCCESS_AT: " + cleanSavePath + "\n\n")
+                            }
+                        }
+                    }
+
+                    // ==========================================
+                    // 🚥 底部控制台：四大核心操作链路（AI 链接 | 提示词生成器 | 一键复制 | 另存为）
+                    // ==========================================
+                    Item {
+                        Layout.fillWidth: true
+                        Layout.maximumHeight: 50
+                        Layout.preferredHeight: 50
+
+                        RowLayout {
+                            id: bottomButtonsLayout
+                            anchors.fill: parent
+                            anchors.leftMargin: parent.width * 0.05
+                            anchors.rightMargin: parent.width * 0.05
+                            spacing: 12
+
+                            // 1. 核心链路：AI 链接 (模块 A)
+                            CyberButton {
+                                id: btnGoToChat
+                                visible: true
+                                btnText: ">>> AI_LINK <<<"
+                                baseColor: palette.neonGreen
+                                Layout.fillWidth: true
+                                Layout.preferredWidth: 3
+                                Layout.preferredHeight: 42
+                                onClicked: {
+                                    compressorPage.visible = false
+                                    chatPage.visible = true
+                                    chatBackend.clearHistory()
+                                    chatModel.clear()
+                                    var promptText = "请阅读以下代码上下文，稍后我会向你提问：\n\n" + resultArea.text
+                                    chatModel.append({"text": "[SYS] UPLOADING_CONTEXT_TO_NEURAL_NET...", "isAi": false})
+                                    chatBackend.sendMessage(promptText)
+                                }
+                            }
+
+                            // ⚡ 核心新增：打开独立提示词生成器页面
+                            CyberButton {
+                                id: btnOpenPromptSelector
+                                btnText: "[ PROMPT_GEN ]"
+                                baseColor: palette.neonCyan
+                                Layout.fillWidth: true
+                                Layout.preferredWidth: 3
+                                Layout.preferredHeight: 42
+                                onClicked: modePopup.open()
+
+                                Popup {
+                                    id: modePopup
+                                    parent: btnOpenPromptSelector
+                                    y: -150
+                                    x: 0
+                                    width: parent.width
+                                    modal: true
+                                    closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+
+                                    background: Rectangle {
+                                        color: palette.panelBg
+                                        border.color: palette.neonCyan
+                                        radius: 4
+                                    }
+
+                                    ColumnLayout {
+                                        anchors.fill: parent
+                                        spacing: 2
+
+                                        Button {
+                                            text: "Qt 开发"
+                                            Layout.fillWidth: true
+                                            palette.buttonText: palette.neonCyan
+                                            background: Rectangle { color: hovered ? palette.bgTop : "transparent" }
+                                            onClicked: {
+                                                modePopup.close()
+                                                chatPage.visible = false
+                                                promptPage.visible = true
+                                                promptPage.refreshPrompt()
+                                            }
+                                        }
+
+                                        Button {
+                                            text: "嵌入式开发"
+                                            Layout.fillWidth: true
+                                            palette.buttonText: palette.textDim
+                                            background: Rectangle { color: hovered ? palette.bgTop : "transparent" }
+                                        }
+                                        Button {
+                                            text: "Linux 开发"
+                                            Layout.fillWidth: true
+                                            palette.buttonText: palette.textDim
+                                            background: Rectangle { color: hovered ? palette.bgTop : "transparent" }
                                         }
                                     }
                                 }
+                            }
 
-                                // ==========================================
-                                // 🚥 底部控制台：三大核心操作链路（AI 链接 | 一键复制 | 另存为）
-                                // ==========================================
-                                Item {
-                                    Layout.fillWidth: true
-                                    Layout.maximumHeight: 50
-                                    Layout.preferredHeight: 50
-
-                                    RowLayout {
-                                                        id: bottomButtonsLayout
-                                                        anchors.fill: parent
-                                                        anchors.leftMargin: parent.width * 0.05
-                                                        anchors.rightMargin: parent.width * 0.05
-                                                        spacing: 12
-
-                                                        // 1. 核心链路：进入本地大模型双向会话 (权重比例：5)
-                                                        CyberButton {
-                                                            id: btnGoToChat
-                                                            visible: false // 只有扫描成功才会亮起
-                                                            btnText: ">>> INITIALIZE_AI_LINK <<<"
-                                                            baseColor: palette.neonGreen
-
-                                                            // ⚡ 工业级自适应比例核心设置
-                                                            Layout.fillWidth: true
-                                                            Layout.preferredWidth: 5
-                                                            Layout.preferredHeight: 42
-
-                                                            onClicked: {
-                                                                compressorPage.visible = false
-                                                                chatPage.visible = true
-                                                                chatBackend.clearHistory()
-                                                                chatModel.clear()
-
-                                                                var promptText = "请阅读以下代码上下文，稍后我会向你提问：\n\n" + resultArea.text
-                                                                chatModel.append({"text": "[SYS] UPLOADING_CONTEXT_TO_NEURAL_NET...", "isAi": false})
-                                                                chatBackend.sendMessage(promptText)
-                                                            }
-                                                        }
-
-                                                        // 2. 极客链路：一键快速拷走 (权重比例：3.5)
-                                                        CyberButton {
-                                                            id: btnQuickCopy
-                                                            visible: btnGoToChat.visible // 跟随主按钮状态联动
-                                                            btnText: "[ COPY_TO_CLIPBOARD ]"
-                                                            baseColor: palette.neonCyan // 使用冷青色进行视觉隔离
-
-                                                            Layout.fillWidth: true
-                                                            Layout.preferredWidth: 3.5
-                                                            Layout.preferredHeight: 42
-
-                                                            onClicked: {
-                                                                resultArea.selectAll()
-                                                                resultArea.copy()
-                                                                resultArea.deselect()
-
-                                                                var originalText = btnText
-                                                                btnText = "[ ✔_COPIED_SUCCESS ]"
-                                                                var t = animationTimer
-                                                                if (!t) {
-                                                                    t = Qt.createQmlObject('import QtQuick 2.0; Timer { interval: 1500; repeat: false; }', btnQuickCopy)
-                                                                }
-                                                                t.triggered.connect(function() { btnText = originalText; })
-                                                                t.start()
-                                                            }
-                                                        }
-
-                                                        // 3. 工业链路：本地文件数据持久化 (权重比例：3)
-                                                        CyberButton {
-                                                            id: btnSaveFile
-                                                            visible: btnGoToChat.visible // 跟随主按钮状态联动
-                                                            btnText: "[ EXPORT_AS_FILE ]"
-                                                            baseColor: palette.textMain // 使用银白色
-
-                                                            Layout.fillWidth: true
-                                                            Layout.preferredWidth: 3
-                                                            Layout.preferredHeight: 42
-
-                                                            onClicked: {
-                                                                saveProjectMapDialog.open()
-                                                            }
-                                                        }
-                                                    }
+                            // 2. 极客链路：一键快速拷走
+                            CyberButton {
+                                id: btnQuickCopy
+                                btnText: "[ COPY ]"
+                                baseColor: palette.textDim
+                                Layout.fillWidth: true
+                                Layout.preferredWidth: 1
+                                Layout.preferredHeight: 42
+                                onClicked: {
+                                    resultArea.selectAll()
+                                    resultArea.copy()
+                                    resultArea.deselect()
+                                    var originalText = btnText
+                                    btnText = "[ ✔_COPIED ]"
+                                    var t = animationTimer
+                                    if (!t) {
+                                        t = Qt.createQmlObject('import QtQuick 2.0; Timer { interval: 1500; repeat: false; }', btnQuickCopy)
+                                    }
+                                    t.triggered.connect(function() { btnText = originalText })
+                                    t.start()
                                 }
-                }
-            }
+                            }  // ← 这里只闭合 CyberButton，不闭合 RowLayout
+
+                            // 3. 工业链路：本地文件数据持久化
+                            CyberButton {
+                                id: btnSaveFile
+                                btnText: "[ SAVE ]"
+                                baseColor: palette.textDim
+                                Layout.fillWidth: true
+                                Layout.preferredWidth: 1
+                                Layout.preferredHeight: 42
+                                onClicked: saveProjectMapDialog.open()
+                            }
+                        } // ← 闭合 RowLayout
+                    } // ← 闭合底部控制台 Item
+
+                } // ← 闭合 compressorPage 内部的 ColumnLayout
+            } // ← 闭合 compressorPage
+
+
 
             // 页面 2：AI 聊天页面
             Item {
@@ -475,9 +522,6 @@ Window {
                     // ==========================================
                     // ⚙️ 工业级重构：大尺寸、全自适应高度 API 配置弹窗
                     // ==========================================
-                    // ==========================================
-                    // ⚙️ CtxPack CONTROL CENTER: API CONFIG DIALOG
-                    // ==========================================
                     Dialog {
                         id: apiConfigDialog
                         title: "[CtxPack.CONFIG] OLLAMA_NET_ENDPOINT // BY dakewick"
@@ -510,8 +554,8 @@ Window {
 
                         // 🎯 斩杀硬编码硬伤核心 1：每次配置弹窗弹起时，强制用 C++ 底层当前实际生效的值刷新输入框
                         onOpened: {
-                            apiUrlInput.text = chatBackend.apiUrl;
-                            apiModelInput.text = chatBackend.modelName;
+                            apiUrlInput.text = chatBackend.apiUrl
+                            apiModelInput.text = chatBackend.modelName
                         }
 
                         contentItem: ColumnLayout {
@@ -586,16 +630,16 @@ Window {
 
                         // 🎯 斩杀硬编码硬伤核心 2：点击保存时，直接命令 chatBackend 压进绝对执行目录
                         onAccepted: {
-                            var success = chatBackend.saveConfig(apiUrlInput.text, apiModelInput.text);
-
+                            var success = chatBackend.saveConfig(apiUrlInput.text, apiModelInput.text)
                             if (success) {
                                 chatModel.append({
                                     "text": "[CtxPack.INFO] NEW_API_AND_MODEL_LOCKED_BY_DAKEWICK.",
                                     "isAi": false
-                                });
+                                })
                             }
                         }
                     }
+
                     // ==========================================
                     // 🚥 聊天页面底部输入栏（完美对齐：输入框 → 发送 → 灰色设置）
                     // ==========================================
@@ -662,9 +706,25 @@ Window {
                             }
                         }
                     }
+                } // ✅ 精确闭合 chatPage 内部 ColumnLayout
+            } // ✅ 精确闭合 chatPage 本身，完美形成兄弟节点
+
+            // ==========================================
+            // 页面 3：提示词生成器专属页面
+            // ==========================================
+            PromptGenerator {
+                id: promptPage
+                // ✅ 作为主 ColumnLayout 的合法子节点，使用 Layout 属性完美自适应
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                visible: false
+
+                onBackRequested: {
+                    promptPage.visible = false
+                    compressorPage.visible = true
                 }
             }
-        }
+        } // ✅ 这里精确闭合整个主外壳内部的最高层 ColumnLayout (之前导致 Crash 就是这附近错乱)
 
         // ==========================================
         // 🧲 核心新增：全局悬浮文件夹拖拽扫描响应层
@@ -700,22 +760,22 @@ Window {
 
             onDropped: (drop) => {
                 if (drop.hasUrls) {
-                    var rawUrl = drop.urls[0].toString();
-                    var cleanPath = "";
+                    var rawUrl = drop.urls[0].toString()
+                    var cleanPath = ""
                     if (rawUrl.startsWith("file:///")) {
-                        cleanPath = rawUrl.substring(8);
+                        cleanPath = rawUrl.substring(8)
                     } else if (rawUrl.startsWith("file:")) {
-                        cleanPath = rawUrl.substring(5);
+                        cleanPath = rawUrl.substring(5)
                     } else {
-                        cleanPath = rawUrl;
+                        cleanPath = rawUrl
                     }
-                    cleanPath = decodeURIComponent(cleanPath);
-                    compressorBackend.startCompression(cleanPath, false);
-                    drop.acceptProposedAction();
+                    cleanPath = decodeURIComponent(cleanPath)
+                    compressorBackend.startCompression(cleanPath, false)
+                    drop.acceptProposedAction()
                 }
             }
         }
-    }
+    } // ✅ 精确闭合 mainShell 主外壳装甲 Rectangle
 
     // ==========================================
     // 4. 核心组件库定义
@@ -789,7 +849,6 @@ Window {
         opacity: isScanning ? 1.0 : 0.0
         Behavior on opacity { NumberAnimation { duration: 600 } }
 
-        // 🎯 优化：改用纯显卡逻辑驱动旋转，不再依赖任何可能报错或引发不稳定的外部 ConicalGradient 组件
         Canvas {
             id: radarCanvas
             anchors.fill: parent
@@ -801,16 +860,30 @@ Window {
                 var cy = height / 2
                 var r = Math.min(cx, cy) - 10
 
-                // 绘制基础静态网格
                 ctx.strokeStyle = "rgba(0, 200, 83, 0.2)"
                 ctx.lineWidth = 1
-                ctx.beginPath(); ctx.moveTo(cx, 0); ctx.lineTo(cx, height); ctx.stroke()
-                ctx.beginPath(); ctx.moveTo(0, cy); ctx.lineTo(width, cy); ctx.stroke()
-                ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke()
-                ctx.beginPath(); ctx.arc(cx, cy, r * 0.66, 0, Math.PI * 2); ctx.stroke()
-                ctx.beginPath(); ctx.arc(cx, cy, r * 0.33, 0, Math.PI * 2); ctx.stroke()
+                ctx.beginPath()
+                ctx.moveTo(cx, 0)
+                ctx.lineTo(cx, height)
+                ctx.stroke()
 
-                // 动态绘制雷达余晖扇形（纯 Canvas 位图自绘，零外部依赖，100% 稳固）
+                ctx.beginPath()
+                ctx.moveTo(0, cy)
+                ctx.lineTo(width, cy)
+                ctx.stroke()
+
+                ctx.beginPath()
+                ctx.arc(cx, cy, r, 0, Math.PI * 2)
+                ctx.stroke()
+
+                ctx.beginPath()
+                ctx.arc(cx, cy, r * 0.66, 0, Math.PI * 2)
+                ctx.stroke()
+
+                ctx.beginPath()
+                ctx.arc(cx, cy, r * 0.33, 0, Math.PI * 2)
+                ctx.stroke()
+
                 if (radar.isScanning) {
                     var sweep = Math.PI / 2
                     for (var i = 0; i < 30; i++) {
@@ -825,7 +898,6 @@ Window {
                 }
             }
 
-            // 渲染线程专属定时更新器
             Timer {
                 interval: 16
                 running: radar.isScanning
@@ -835,49 +907,7 @@ Window {
                     radarCanvas.requestPaint()
                 }
             }
-        }
-    }
+        } // Canvas 闭合
+    } // RadarBackground 闭合
 
-    // ==========================================
-    // 5. 虚拟键盘装甲底座集成
-    // ==========================================
-    Item {
-        id: keyboardContainer
-        z: 99
-        width: parent.width
-        height: inputPanel.height + 24
-        y: parent.height
-
-        HudFrame {
-            anchors.fill: parent
-            accentColor: palette.neonGreen
-            color: palette.panelBg
-
-            InputPanel {
-                id: inputPanel
-                anchors.centerIn: parent
-                width: parent.width - 16
-            }
-        }
-
-        states: State {
-            name: "visible"
-            when: inputPanel.active
-            PropertyChanges {
-                target: keyboardContainer
-                y: root.height - keyboardContainer.height
-            }
-        }
-
-        transitions: Transition {
-            from: ""
-            to: "visible"
-            reversible: true
-            NumberAnimation {
-                properties: "y"
-                duration: 350
-                easing.type: Easing.OutExpo
-            }
-        }
-    }
-}
+} // Window (root) 闭合
