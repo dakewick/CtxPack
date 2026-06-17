@@ -9,6 +9,9 @@ Item {
     // 向主窗体发送返回信号
     signal backRequested()
 
+    // 代码雷达后端 (由 Main.qml 注入)
+    property var codeRadarBackend: null
+
     // 内部固化调色板
     QtObject {
         id: localPalette
@@ -187,7 +190,33 @@ Item {
                             background: Rectangle { color: localPalette.bgBottom; border.color: localPalette.textDim }
                             onTextChanged: root.generatePrompt()
                         }
-                        Text { text: "现有代码/日志 (选填):"; color: localPalette.textMain }
+                        RowLayout {
+                            Layout.fillWidth: true
+                            Text { text: "现有代码/日志 (选填):"; color: localPalette.textMain }
+                            Item { Layout.fillWidth: true }
+                            Button {
+                                id: btnRadar
+                                text: "📡 代码雷达"
+                                Layout.preferredHeight: 26
+                                contentItem: Text {
+                                    text: btnRadar.text
+                                    color: btnRadar.pressed ? "#121826" : localPalette.neonGreen
+                                    font.family: "Courier New"
+                                    font.pixelSize: 11
+                                    font.weight: Font.Bold
+                                    horizontalAlignment: Text.AlignHCenter
+                                    verticalAlignment: Text.AlignVCenter
+                                }
+                                background: Rectangle {
+                                    color: btnRadar.pressed ? localPalette.neonGreen : "transparent"
+                                    border.color: localPalette.neonGreen
+                                    border.width: 1
+                                    radius: 2
+                                    Behavior on color { ColorAnimation { duration: 100 } }
+                                }
+                                onClicked: radarPopup.open()
+                            }
+                        }
                         TextArea {
                             id: id_txtCodeLog
                             placeholderText: "粘贴相关源码或崩溃日志..."
@@ -451,6 +480,215 @@ Item {
                     var t = Qt.createQmlObject('import QtQuick 2.0; Timer { interval: 1500; repeat: false; }', btnCopyPrompt)
                     t.triggered.connect(function() { text = originalText; t.destroy() })
                     t.start()
+                }
+            }
+        }
+    }
+
+    // ==========================================
+    // 📡 代码雷达搜索弹窗
+    // ==========================================
+    Popup {
+        id: radarPopup
+        anchors.centerIn: parent
+        width: parent.width * 0.85
+        height: parent.height * 0.8
+        modal: true
+        closePolicy: Popup.CloseOnEscape
+
+        background: Rectangle {
+            color: localPalette.panelBg
+            border.color: localPalette.neonGreen
+            border.width: 1
+            radius: 4
+        }
+
+        onOpened: {
+            radarInput.text = ""
+            radarResultText.text = ""
+            radarInput.forceActiveFocus()
+        }
+
+        ColumnLayout {
+            anchors.fill: parent
+            anchors.margins: 16
+            spacing: 10
+
+            Text {
+                text: "📡 代码雷达 // CODE_RADAR"
+                color: localPalette.neonGreen
+                font.family: "Courier New"
+                font.pixelSize: 16
+                font.bold: true
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 8
+
+                TextField {
+                    id: radarInput
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 34
+                    placeholderText: "输入搜索词，如 void"
+                    placeholderTextColor: localPalette.textDim
+                    color: localPalette.neonCyan
+                    font.family: "Courier New"
+                    font.pixelSize: 13
+                    font.weight: Font.Bold
+                    leftPadding: 10
+                    background: Rectangle {
+                        color: localPalette.bgBottom
+                        border.color: Qt.alpha(localPalette.neonCyan, 0.5)
+                        border.width: 1
+                        radius: 2
+                    }
+                    Keys.onReturnPressed: btnSearch.clicked()
+                }
+
+                Button {
+                    id: btnSearch
+                    text: "🔍 搜索"
+                    Layout.preferredHeight: 34
+                    Layout.preferredWidth: 80
+                    contentItem: Text {
+                        text: btnSearch.text
+                        color: btnSearch.pressed ? "#121826" : localPalette.neonGreen
+                        font.family: "Courier New"
+                        font.pixelSize: 13
+                        font.weight: Font.Bold
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                    background: Rectangle {
+                        color: btnSearch.pressed ? localPalette.neonGreen : "transparent"
+                        border.color: localPalette.neonGreen
+                        border.width: 1
+                        radius: 2
+                        Behavior on color { ColorAnimation { duration: 100 } }
+                    }
+                    onClicked: {
+                        if (!codeRadarBackend) {
+                            radarResultText.text = "[ERR] 后端未就绪"
+                            return
+                        }
+                        if (radarInput.text.trim() === "") {
+                            radarResultText.text = "[ERR] 搜索词不能为空"
+                            return
+                        }
+                        radarResultText.text = "⏳ 正在扫描..."
+                        btnSearch.enabled = false
+
+                        var ret = codeRadarBackend.searchCodeRadar(codeRadarBackend.currentProjectPath, radarInput.text.trim())
+                        btnSearch.enabled = true
+
+                        if (ret.status === "error") {
+                            radarResultText.text = "❌ " + ret.message
+                            return
+                        }
+
+                        var count = ret.count
+                        var lines = []
+                        lines.push("🔍 共命中 " + count + " 处:\n")
+                        var results = ret.results
+                        if (results && results.length > 0) {
+                            for (var i = 0; i < results.length; i++) {
+                                var r = results[i]
+                                lines.push("━━━━━━━━━━━━━━━━━━━━━━")
+                                lines.push("📄 " + r.file + " : " + r.line + " 行")
+                                lines.push("```\n" + r.code + "\n```\n")
+                            }
+                        } else {
+                            lines.push("未找到匹配项")
+                        }
+                        radarResultText.text = lines.join("\n")
+                    }
+                }
+            }
+
+            // 搜索结果预览区
+            ScrollView {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                clip: true
+                ScrollBar.vertical: ScrollBar {
+                    policy: ScrollBar.AsNeeded
+                    width: 8
+                    background: Rectangle { color: localPalette.bgBottom }
+                    contentItem: Rectangle { color: localPalette.neonGreen; radius: 4 }
+                }
+
+                TextArea {
+                    id: radarResultText
+                    readOnly: true
+                    wrapMode: TextArea.Wrap
+                    font.family: "Courier New"
+                    font.pixelSize: 12
+                    color: localPalette.neonGreen
+                    background: Rectangle {
+                        color: localPalette.bgBottom
+                        border.color: Qt.alpha(localPalette.neonGreen, 0.3)
+                        border.width: 1
+                        radius: 2
+                    }
+                }
+            }
+
+            // 底部按钮
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 10
+
+                Button {
+                    text: "📥 一键导入到代码区"
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 36
+                    contentItem: Text {
+                        text: parent.text
+                        color: parent.pressed ? "#121826" : localPalette.neonCyan
+                        font.family: "Courier New"
+                        font.pixelSize: 13
+                        font.weight: Font.Bold
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                    background: Rectangle {
+                        color: parent.pressed ? localPalette.neonCyan : "transparent"
+                        border.color: localPalette.neonCyan
+                        border.width: 1
+                        radius: 2
+                        Behavior on color { ColorAnimation { duration: 100 } }
+                    }
+                    onClicked: {
+                        var preview = radarResultText.text
+                        if (preview && preview.indexOf("❌") !== 0 && preview.indexOf("[ERR]") !== 0 && preview.indexOf("⏳") !== 0) {
+                            id_txtCodeLog.text = preview
+                        }
+                        radarPopup.close()
+                    }
+                }
+
+                Button {
+                    text: "取消"
+                    Layout.preferredWidth: 100
+                    Layout.preferredHeight: 36
+                    contentItem: Text {
+                        text: parent.text
+                        color: parent.pressed ? "#121826" : localPalette.textDim
+                        font.family: "Courier New"
+                        font.pixelSize: 13
+                        font.weight: Font.Bold
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                    background: Rectangle {
+                        color: parent.pressed ? localPalette.textDim : "transparent"
+                        border.color: localPalette.textDim
+                        border.width: 1
+                        radius: 2
+                        Behavior on color { ColorAnimation { duration: 100 } }
+                    }
+                    onClicked: radarPopup.close()
                 }
             }
         }

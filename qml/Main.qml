@@ -364,21 +364,37 @@ Window {
                                                 modePopup.close()
                                                 chatPage.visible = false
                                                 promptPage.visible = true
-                                                promptPage.refreshPrompt()
+                                                promptPage.generatePrompt()
                                             }
                                         }
 
                                         Button {
                                             text: "嵌入式开发"
                                             Layout.fillWidth: true
-                                            palette.buttonText: palette.textDim
+                                            palette.buttonText: palette.neonCyan
                                             background: Rectangle { color: hovered ? palette.bgTop : "transparent" }
+                                            onClicked: {
+                                                modePopup.close()
+                                                chatPage.visible = false
+                                                promptPage.visible = false
+                                                linuxPage.visible = false
+                                                embeddedPage.visible = true
+                                                embeddedPage.generatePrompt()
+                                            }
                                         }
                                         Button {
                                             text: "Linux 开发"
                                             Layout.fillWidth: true
-                                            palette.buttonText: palette.textDim
+                                            palette.buttonText: palette.neonCyan
                                             background: Rectangle { color: hovered ? palette.bgTop : "transparent" }
+                                            onClicked: {
+                                                modePopup.close()
+                                                chatPage.visible = false
+                                                promptPage.visible = false
+                                                embeddedPage.visible = false
+                                                linuxPage.visible = true
+                                                linuxPage.generatePrompt()
+                                            }
                                         }
                                     }
                                 }
@@ -710,17 +726,49 @@ Window {
             } // ✅ 精确闭合 chatPage 本身，完美形成兄弟节点
 
             // ==========================================
-            // 页面 3：提示词生成器专属页面
+            // 页面 3：提示词生成器专属页面 (Qt 开发)
             // ==========================================
             PromptGenerator {
                 id: promptPage
-                // ✅ 作为主 ColumnLayout 的合法子节点，使用 Layout 属性完美自适应
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 visible: false
+                codeRadarBackend: compressorBackend
 
                 onBackRequested: {
                     promptPage.visible = false
+                    compressorPage.visible = true
+                }
+            }
+
+            // ==========================================
+            // 页面 4：嵌入式开发提示词生成器
+            // ==========================================
+            EmbeddedPromptGenerator {
+                id: embeddedPage
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                visible: false
+                codeRadarBackend: compressorBackend
+
+                onBackRequested: {
+                    embeddedPage.visible = false
+                    compressorPage.visible = true
+                }
+            }
+
+            // ==========================================
+            // 页面 5：Linux 开发提示词生成器
+            // ==========================================
+            LinuxPromptGenerator {
+                id: linuxPage
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                visible: false
+                codeRadarBackend: compressorBackend
+
+                onBackRequested: {
+                    linuxPage.visible = false
                     compressorPage.visible = true
                 }
             }
