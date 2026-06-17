@@ -1,5 +1,5 @@
 # 📦 CtxPack // 项目架构智能分析地图 (Ultimate Fusion Edition)
-> 🎯 生成时间: 2026-06-10 15:48:26
+> 🎯 生成时间: 2026-06-17 18:06:31
 > 🤖 编译环境: CtxPack Core v1.0 | DEPLOYED BY dakewick
 
 
@@ -40,9 +40,26 @@
     void messageReceived(const QString &text);
 ```
 
+## 📄 AIAgent_ContextCompressor\code_radar.py
+```
+  📦 import os
+  📦 import sys
+  📦 import json
+  📦 import re
+  🔧 功能方法: def clean_line_for_braces(line)
+  🔧 功能方法: def get_indent_level(line)
+  🔗 网络通信: def extract_py_block(lines, start_idx)
+  🔗 网络通信: def extract_cpp_block(lines, start_idx)
+  💾 数据持久化: def read_file_safely(filepath)
+  🔧 功能方法: def build_search_regex(target_string)
+  ✅ 验证检查: def scan_project(directory, target_string)
+```
+
 ## 📄 AIAgent_ContextCompressor\compressorbackend.cpp
 ```
+  ⚙️ RADAR_TIMEOUT_MS = 10000
   ⚙️ MIN_ANIMATION_MS = 1000
+  ⚙️ RADAR_SCRIPT = code_radar.py
   ⚙️ OUTPUT_FILE = project_map.md
   ⚙️ EXTRACT_SCRIPT = extract_skeleton.py
   📡 QProcess::readyReadStandardOutput → ...
@@ -54,10 +71,13 @@
   📡 emit: emit progressUpdated("⚠️ 当前有任务正在执行，请稍后...");
   📡 emit: emit compressionFinished(errorMsg, false);
   📡 emit: emit compressionFinished(errorMsg, false);
+  📡 emit: emit currentProjectPathChanged();
   📡 emit: emit isRunningChanged();
   📡 emit: emit progressUpdated("🚀 启动解析引擎...");
   🤖 硬件控制: void singleShot(PROCESS_TIMEOUT_MS, this, [this]()
   💾 数据持久化: bool saveToFile(const QString &savePath, const QString &content)
+  🔧 功能方法: QString resolvePython()
+  🔧 功能方法: QVariantMap searchCodeRadar(const QString &projectDir, const QString &target)
   🤖 任务执行: void finishProcess(const QString &content, bool success)
   📡 emit: emit isRunningChanged();
   📡 emit: emit compressionFinished(content, success);
@@ -72,8 +92,11 @@
     explicit CompressorBackend(QObject *parent = nullptr);
     Q_INVOKABLE void startCompression(const QString &projectPath, bool isLinuxMode);
     Q_INVOKABLE bool saveToFile(const QString &savePath, const QString &content);
+    Q_INVOKABLE void cancelCompression();
+    Q_INVOKABLE QVariantMap searchCodeRadar(const QString &projectDir, const QString &target);
   signals:
     void isRunningChanged();
+    void currentProjectPathChanged();
     void progressUpdated(const QString &statusText);
     void compressionFinished(const QString &resultMarkdown, bool success);
     void finishProcess(const QString &content, bool success);
@@ -127,8 +150,10 @@ graph TB
 - `REQUEST_TIMEOUT_MS` = `300000`
 - `EXTRACT_SCRIPT` = `extract_skeleton.py`
 - `OUTPUT_FILE` = `project_map.md`
+- `RADAR_SCRIPT` = `code_radar.py`
 - `MIN_ANIMATION_MS` = `1000`
 - `PROCESS_TIMEOUT_MS` = `300000`
+- `RADAR_TIMEOUT_MS` = `10000`
 
 ### 🌐 网络/网络通信端点
 
@@ -155,7 +180,7 @@ graph TB
 - 项目依赖核心基类：`QObject`，修改子类时请注意基类虚函数实现。
 - 逆向上下文中已过滤大量纯样式及布局噪点，请开发者在提示 AI 时结合 `🔄 核心业务流程` 进行精准切入。
 ## 📈 项目总体指标统计
-- 📁 有效解析工程文件: 5 个 | 📝 估算源码有效总行数: 721 行
-- 🔧 捕获业务函数/核心方法: 12 个 | ⚙️ 核心配置/常量项: 8 个 | 🏗️ 类定义层级: 2 个
-- 📉 [Token 压缩防御矩阵] 原始全量体积: 7,747 Tokens ➔ CtxPack 压缩精炼骨架: 1,469 Tokens
-- ⚡ [CtxPack 效能评级] 本次架构强力逆向压榨率: 81.0% | AI 上下文视窗安全系数极高
+- 📁 有效解析工程文件: 6 个 | 📝 估算源码有效总行数: 1,057 行
+- 🔧 捕获业务函数/核心方法: 21 个 | ⚙️ 核心配置/常量项: 10 个 | 🏗️ 类定义层级: 2 个
+- 📉 [Token 压缩防御矩阵] 原始全量体积: 10,958 Tokens ➔ CtxPack 压缩精炼骨架: 1,751 Tokens
+- ⚡ [CtxPack 效能评级] 本次架构强力逆向压榨率: 84.0% | AI 上下文视窗安全系数极高
